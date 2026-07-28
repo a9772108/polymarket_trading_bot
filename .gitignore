@@ -1,0 +1,8 @@
+config/config.php
+.env
+storage/logs/*.log
+storage/cache/*
+!storage/logs/.gitkeep
+!storage/cache/.gitkeep
+vendor/
+node_modules/

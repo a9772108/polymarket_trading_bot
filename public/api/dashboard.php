@@ -17,7 +17,27 @@ try {
 
     $markets = $client->searchActiveBtcFiveMinuteMarkets();
     $market = $markets[0] ?? null;
-    $geo = $client->checkGeoblock();
+
+    $geo = [
+        'blocked' => true,
+        'country' => 'unknown',
+        'region' => 'unknown',
+        'available' => false,
+        'error' => null,
+    ];
+
+    try {
+        $geoResponse = $client->checkGeoblock();
+        $geo = [
+            'blocked' => (bool) ($geoResponse['blocked'] ?? true),
+            'country' => (string) ($geoResponse['country'] ?? 'unknown'),
+            'region' => (string) ($geoResponse['region'] ?? 'unknown'),
+            'available' => true,
+            'error' => null,
+        ];
+    } catch (Throwable $geoException) {
+        $geo['error'] = $geoException->getMessage();
+    }
 
     $tokens = [];
     if (is_array($market)) {
@@ -39,11 +59,28 @@ try {
                 continue;
             }
 
+            $midpoint = null;
+            $spread = null;
+
+            try {
+                $midpointResponse = $client->getMidpoint($tokenId);
+                $midpoint = $midpointResponse['mid_price'] ?? $midpointResponse['mid'] ?? null;
+            } catch (Throwable) {
+                $midpoint = null;
+            }
+
+            try {
+                $spreadResponse = $client->getSpread($tokenId);
+                $spread = $spreadResponse['spread'] ?? null;
+            } catch (Throwable) {
+                $spread = null;
+            }
+
             $tokens[] = [
                 'token_id' => $tokenId,
                 'outcome' => (string) ($outcomes[$index] ?? ('Outcome ' . ($index + 1))),
-                'midpoint' => $client->getMidpoint($tokenId)['mid'] ?? null,
-                'spread' => $client->getSpread($tokenId)['spread'] ?? null,
+                'midpoint' => $midpoint,
+                'spread' => $spread,
             ];
         }
     }
@@ -52,11 +89,7 @@ try {
         'ok' => true,
         'generated_at' => date(DATE_ATOM),
         'mode' => 'paper',
-        'geoblock' => [
-            'blocked' => (bool) ($geo['blocked'] ?? true),
-            'country' => (string) ($geo['country'] ?? 'unknown'),
-            'region' => (string) ($geo['region'] ?? 'unknown'),
-        ],
+        'geoblock' => $geo,
         'market' => $market ? [
             'id' => $market['id'] ?? null,
             'question' => $market['question'] ?? null,

@@ -167,6 +167,18 @@ body {
     letter-spacing: -0.045em;
 }
 
+.onchain-card {
+    scroll-margin-top: 6rem;
+    border-color: rgba(25, 135, 84, 0.42);
+}
+
+.onchain-card::before {
+    display: block;
+    height: 0.22rem;
+    content: "";
+    background: linear-gradient(90deg, var(--bs-success), var(--lab-cyan));
+}
+
 .outcome-book {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

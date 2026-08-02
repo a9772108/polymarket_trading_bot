@@ -101,6 +101,9 @@ The replay is look-ahead-safe at the selected timestamp, but it cannot reconstru
 
 ## Configuration
 
+BTC 5-minute mode includes an **On-chain Observer** link in the sticky header. It opens a paper-only panel that records public mempool activity and optional point-in-time exchange flows for later backtesting. The observer always reports `applied_to_trading: false`; its suggested adjustment is displayed but never used by the model.
+
+
 Copy `config/config.example.php` to `config/config.php` if needed. The relevant paper settings are:
 
 - starting balance

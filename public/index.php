@@ -40,6 +40,9 @@ $intervalLabel = (int) $marketMode['interval_minutes'] . '-minute';
             </div>
             <a class="btn btn-sm btn-outline-info" href="live.php">BTC Live Monitor</a>
             <a class="btn btn-sm btn-outline-light" href="backtest.php">BTC Backtest</a>
+            <?php if ($modeKey === 'btc-5m'): ?>
+                <a class="btn btn-sm btn-outline-success" href="#onchain-experiment">On-chain Observer</a>
+            <?php endif; ?>
             <span id="feedBadge" class="badge text-bg-secondary">FEED CONNECTING</span>
             <span class="badge text-bg-warning">PAPER ONLY</span>
         </div>
@@ -175,6 +178,31 @@ $intervalLabel = (int) $marketMode['interval_minutes'] . '-minute';
     </section>
 
     <div class="row g-3 mb-3" id="outcomeCards"></div>
+
+    <?php if ($modeKey === 'btc-5m'): ?>
+        <section id="onchain-experiment" class="card onchain-card shadow-sm mb-3" aria-labelledby="onchainHeading">
+            <div class="card-body p-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                    <div>
+                        <div class="eyebrow">Experimental on-chain observer</div>
+                        <h2 id="onchainHeading" class="h5 mt-1 mb-1">Mempool and exchange-flow evidence</h2>
+                        <p class="small text-secondary mb-0">Recorded for backtesting only; never applied to paper-trade decisions.</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button id="onchainRefresh" type="button" class="btn btn-sm btn-outline-success">Refresh observer</button>
+                        <span id="onchainStatus" class="badge text-bg-secondary">LOADING</span>
+                    </div>
+                </div>
+                <div class="flow-grid mt-3">
+                    <div><span>Mempool transactions</span><strong id="mempoolCount">&mdash;</strong><small>Unconfirmed Bitcoin transactions</small></div>
+                    <div><span>Recent largest output</span><strong id="largestRecentOutput">&mdash;</strong><small>Includes change; not exchange attribution</small></div>
+                    <div><span>Flow direction</span><strong id="flowDirection">Neutral</strong><small id="flowAvailability">No exchange-flow feed configured</small></div>
+                    <div><span>Suggested adjustment</span><strong id="flowAdjustment">+0.00%</strong><small>Displayed only; capped at &plusmn;3%</small></div>
+                </div>
+                <div id="onchainDetails" class="notice-box mt-3">Connecting to the public Bitcoin mempool feed...</div>
+            </div>
+        </section>
+    <?php endif; ?>
 
     <section class="card flow-card shadow-sm mb-3" aria-labelledby="flowHeading">
         <div class="card-body p-4">
@@ -447,5 +475,8 @@ $intervalLabel = (int) $marketMode['interval_minutes'] . '-minute';
 </main>
 
 <script src="assets/js/app.js?v=<?= (int) filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
+<?php if ($modeKey === 'btc-5m'): ?>
+    <script src="assets/js/onchain.js?v=<?= (int) filemtime(__DIR__ . '/assets/js/onchain.js') ?>"></script>
+<?php endif; ?>
 </body>
 </html>

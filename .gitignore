@@ -1,7 +1,11 @@
 config/config.php
+config/polymarket_international.local.php
 .env
 storage/logs/*.log
 storage/cache/*
+storage/*.sqlite
+storage/*.sqlite-shm
+storage/*.sqlite-wal
 !storage/logs/.gitkeep
 !storage/cache/.gitkeep
 vendor/

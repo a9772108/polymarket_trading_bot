@@ -10,18 +10,45 @@ final class PolymarketClient
 
     public function searchActiveBtcFiveMinuteMarkets(int $limit = 50): array
     {
-        $now = time();
-        $slot = intdiv($now, 300) * 300;
+        return $this->searchActiveUpDownMarkets('btc', 5, $limit);
+    }
 
-        // BTC 5-minute markets use a predictable slug containing the interval start timestamp.
+    public function searchActiveUpDownMarkets(
+        string $asset,
+        int $intervalMinutes,
+        int $limit = 50
+    ): array {
+        $asset = strtolower(trim($asset));
+        if (!in_array($asset, ['btc', 'eth'], true) || !in_array($intervalMinutes, [5, 15], true)) {
+            throw new InvalidArgumentException('Unsupported paper market mode.');
+        }
+
+        $intervalSeconds = $intervalMinutes * 60;
+        $now = time();
+        $slot = intdiv($now, $intervalSeconds) * $intervalSeconds;
+
+        // Crypto Up/Down markets use a predictable slug containing the interval start timestamp.
         // Check the current slot first, then nearby slots to tolerate clock/API publication delays.
-        foreach ([0, -300, 300, -600, 600] as $offset) {
-            $slug = 'btc-updown-5m-' . ($slot + $offset);
+        foreach ([0, -$intervalSeconds, $intervalSeconds, -2 * $intervalSeconds, 2 * $intervalSeconds] as $offset) {
+            $slug = sprintf(
+                '%s-updown-%dm-%d',
+                $asset,
+                $intervalMinutes,
+                $slot + $offset
+            );
             $market = $this->getJsonOrNull(
                 $this->config['gamma_base_url'] . '/markets/slug/' . rawurlencode($slug)
             );
 
-            if (is_array($market) && $this->isTradableCurrentFiveMinuteMarket($market, $now)) {
+            if (
+                is_array($market)
+                && $this->isTradableCurrentUpDownMarket(
+                    $market,
+                    $now,
+                    $asset,
+                    $intervalMinutes
+                )
+            ) {
                 return [$market];
             }
         }
@@ -38,8 +65,17 @@ final class PolymarketClient
 
         $markets = $this->getJson($this->config['gamma_base_url'] . '/markets?' . $query);
 
-        $filtered = array_values(array_filter($markets, function (array $market) use ($now): bool {
-            return $this->isTradableCurrentFiveMinuteMarket($market, $now);
+        $filtered = array_values(array_filter($markets, function (array $market) use (
+            $now,
+            $asset,
+            $intervalMinutes
+        ): bool {
+            return $this->isTradableCurrentUpDownMarket(
+                $market,
+                $now,
+                $asset,
+                $intervalMinutes
+            );
         }));
 
         usort($filtered, static function (array $a, array $b): int {
@@ -47,6 +83,13 @@ final class PolymarketClient
         });
 
         return $filtered;
+    }
+
+    public function getMarketBySlug(string $slug): ?array
+    {
+        return $this->getJsonOrNull(
+            $this->config['gamma_base_url'] . '/markets/slug/' . rawurlencode($slug)
+        );
     }
 
     public function getOrderBook(string $tokenId): array
@@ -70,25 +113,49 @@ final class PolymarketClient
         ) ?? [];
     }
 
+    public function getLiveVolume(int $eventId): array
+    {
+        if ($eventId < 1) {
+            return [];
+        }
+
+        $dataBaseUrl = (string) ($this->config['data_base_url'] ?? 'https://data-api.polymarket.com');
+
+        return $this->getJson(
+            rtrim($dataBaseUrl, '/')
+            . '/live-volume?'
+            . http_build_query(['id' => $eventId])
+        );
+    }
+
     public function checkGeoblock(): array
     {
         return $this->getJson($this->config['geoblock_url']);
     }
 
-    private function isTradableCurrentFiveMinuteMarket(array $market, int $now): bool
-    {
+    private function isTradableCurrentUpDownMarket(
+        array $market,
+        int $now,
+        string $asset,
+        int $intervalMinutes
+    ): bool {
         $question = strtolower((string) ($market['question'] ?? ''));
         $slug = strtolower((string) ($market['slug'] ?? ''));
         $text = $question . ' ' . $slug;
         $endTimestamp = strtotime((string) ($market['endDate'] ?? ''));
         $startTimestamp = strtotime((string) ($market['startDate'] ?? ''));
 
-        $looksLikeBtcFiveMinute = str_contains($text, 'btc') || str_contains($text, 'bitcoin');
-        $looksLikeBtcFiveMinute = $looksLikeBtcFiveMinute
+        $assetName = $asset === 'btc' ? 'bitcoin' : 'ethereum';
+        $looksLikeRequestedMarket = str_contains($text, $asset) || str_contains($text, $assetName);
+        $looksLikeRequestedMarket = $looksLikeRequestedMarket
             && (str_contains($text, 'up or down') || str_contains($text, 'up-down') || str_contains($text, 'updown'))
-            && (str_contains($text, '5m') || str_contains($text, '5 min') || str_contains($text, '5-minute'));
+            && (
+                str_contains($text, $intervalMinutes . 'm')
+                || str_contains($text, $intervalMinutes . ' min')
+                || str_contains($text, $intervalMinutes . '-minute')
+            );
 
-        if (!$looksLikeBtcFiveMinute || $endTimestamp === false) {
+        if (!$looksLikeRequestedMarket || $endTimestamp === false) {
             return false;
         }
 
@@ -101,11 +168,12 @@ final class PolymarketClient
         }
 
         // Must not be expired and should be the current or immediately upcoming interval.
-        if ($endTimestamp <= $now || $endTimestamp > $now + 900) {
+        $maximumFutureEnd = max(900, $intervalMinutes * 120);
+        if ($endTimestamp <= $now || $endTimestamp > $now + $maximumFutureEnd) {
             return false;
         }
 
-        if ($startTimestamp !== false && $startTimestamp > $now + 600) {
+        if ($startTimestamp !== false && $startTimestamp > $now + ($intervalMinutes * 60)) {
             return false;
         }
 
